@@ -1,10 +1,12 @@
-from discord.ext import commands
+from asyncio import tasks
+from discord.ext import commands, tasks
 import discord
 import os
 from decouple import config
 import steamsales
+import epicgamesfree
 import re
-import asyncio
+import datetime
 
 BOT_TOKEN = config('BOT_TOKEN', None)
 CHANNEL_ID = int(config('CHANNEL_ID', None))
@@ -16,10 +18,12 @@ async def on_ready():
     channel = bot.get_channel(CHANNEL_ID)
     embed = discord.Embed(
         title="Mystic Bot",
-        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -help: shows all bot commands.",
+        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -freethisweek Displays information on the games that can be redeemed for free on Epic Games.\n -help: shows all bot commands.",
         color=discord.Color.red()
     )
     await channel.send(embed=embed)
+    if not free_games_weekly_post.is_running():
+        free_games_weekly_post.start()
 
 @bot.command()
 async def specials(ctx):
@@ -69,5 +73,33 @@ async def specials(ctx):
         await ctx.send(embed=embed)
 
     return
+
+@bot.command()
+async def freethisweek(ctx):
+    '''Displays information on the games that are free to redeem on Epic Games.'''
+    await ctx.send(f"# Gathering Information...")
+
+    games = epicgamesfree.get_free_epic_games()
+    for game in games:
+        embed = discord.Embed(
+            title=game.title,
+            description=game.description,
+            color=discord.Color.blue()
+        )
+
+        if game.game_image:
+            embed.set_image(url=game.game_image)
+
+        embed.url = game.game_url
+
+        await ctx.send(embed=embed)
+
+    return
+
+@tasks.loop(hours=168, minutes=0, tzinfo=datetime.timezone.utc)
+async def free_games_weekly_post():
+    if datetime.datetime.now(datetime.timezone.utc).weekday() == 3: # Only posts on Thursdays (when the new free games are out)
+        channel = bot.get_channel(CHANNEL_ID)
+        await freethisweek(channel)
 
 bot.run(BOT_TOKEN)

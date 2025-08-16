@@ -343,5 +343,3 @@ def steam_specials():
         os.remove(game_file)
 
     return specials
-
-steam_specials()
