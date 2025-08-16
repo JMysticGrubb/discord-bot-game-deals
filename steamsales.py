@@ -1,9 +1,11 @@
 #steamsales.py
 
 from urllib.request import urlopen
+from bs4 import BeautifulSoup
 import re
 from decouple import config
 import os
+import threading
 
 class GameInfo:
     title = None
@@ -28,6 +30,7 @@ class GameInfo:
         self.discounted_price = discounted_price
         self.game_url = game_url
         self.game_image = game_image
+
 
 
 def last_substring_file(file, substring):
@@ -62,6 +65,8 @@ def last_substring_file(file, substring):
 
     return last_line, last_index
 
+
+
 def find_occurence(text, substring, occurrence, start_point):
     '''
     Finds the nth occurrence of a substring in a text
@@ -81,6 +86,8 @@ def find_occurence(text, substring, occurrence, start_point):
         occurrence -= 1
     return start
 
+
+
 def flatten_list(list):
     '''
     Flattens the list so that it is not pair based
@@ -99,6 +106,8 @@ def flatten_list(list):
             flatlist.append(item2)
 
     return flatlist
+
+
 
 def retrieve_top_5(file, last_line, last_index):
     '''
@@ -121,6 +130,8 @@ def retrieve_top_5(file, last_line, last_index):
             except:
                 pass
     return top5_games
+
+
 
 def get_game_link(file, gameid):
     '''
@@ -148,6 +159,8 @@ def get_game_link(file, gameid):
 
     return game_link
 
+
+
 def get_game_html(game_link):
     '''
     Creates a text file with the html for a game or package's webpage
@@ -174,6 +187,8 @@ def get_game_html(game_link):
 
     return game_file
 
+
+
 def get_game_description(game_link):
     '''
     Gets the description for a steam game
@@ -190,6 +205,8 @@ def get_game_description(game_link):
         game_description = match.group(1)
     
     return game_description
+
+
 
 def get_game_tags(game_link):
     '''
@@ -211,6 +228,8 @@ def get_game_tags(game_link):
                 game_tags.append(match.group(1).strip())
     return game_tags
 
+
+
 def get_game_ratings(game_link):
     '''
     Gets the monthly and overall ratings for a steam game
@@ -228,6 +247,8 @@ def get_game_ratings(game_link):
         monthly_ratings = ratings[0]
         all_ratings = ratings[1]
     return monthly_ratings, all_ratings
+
+
 
 def get_game_price(game_link):
     '''
@@ -256,6 +277,29 @@ def get_game_image(game_link):
         game_image = match.group(1)
     return game_image
 
+def get_game_info(base_file, game, specials):
+    '''
+    Gets the information from a game or package on steam
+
+    Args:
+        game (int): integer representing a game or packages id
+
+    Returns:
+        None
+    '''
+    game_link = get_game_link(base_file, game)
+    game_file = get_game_html(game_link)
+    title = str(game_file)
+    description = get_game_description(game_file)
+    tags = get_game_tags(game_file)
+    tags = [tag for tag in tags if tag.strip()]
+    monthly_ratings, all_ratings = get_game_ratings(game_file)
+    discount_percent, original_price, discount_price = get_game_price(game_file)
+    match = re.search(rf"(.*?{title}/)", game_link)
+    game_url = match.group(1)
+    game_image = get_game_image(game_file)
+    game = GameInfo(title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image)
+    specials.append(game)
 
 '''
 # steamsales.py scrapes data from the top sellers section in the specials category on the steam store page.
@@ -267,32 +311,29 @@ def steam_specials():
 
     html_bytes = page.read() # retrieves the bytes of information
     html = html_bytes.decode("utf-8") # turns the html_bytes into readable html
+    soup = BeautifulSoup(html, 'html.parser')
 
     base_file = "html_steam" # Set the file path to the same directory as program but the file html_steam
 
     # write the html into a file and start looking for data
     with open(base_file, "w", encoding="utf-8") as f:
-        f.write(html)
+        f.write(soup.prettify())
 
     last_line, last_index = last_substring_file(base_file, "specials") # Find the line and index of the last occurence of "specials"
     top5_games = retrieve_top_5(base_file, last_line, last_index)
     top5_games = flatten_list(top5_games)
     specials = []
+    threads = []
 
     for game in top5_games:
-        game_link = get_game_link(base_file, game)
-        game_file = get_game_html(game_link)
-        title = str(game_file)
-        description = get_game_description(game_file)
-        tags = get_game_tags(game_file)
-        tags = [tag for tag in tags if tag.strip()]
-        monthly_ratings, all_ratings = get_game_ratings(game_file)
-        discount_percent, original_price, discount_price = get_game_price(game_file)
-        match = re.search(rf"(.*?{title}/)", game_link)
-        game_url = match.group(1)
-        game_image = get_game_image(game_file)
-        game = GameInfo(title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image)
-        specials.append(game)
+        t = threading.Thread(target=get_game_info, args=(base_file, game, specials))
+        threads.append(t)
+
+    for t in threads:
+        t.start()
+
+    for t in threads:
+        t.join()
 
     for game in top5_games:
         game_link = get_game_link(base_file, game)
@@ -300,3 +341,5 @@ def steam_specials():
         os.remove(game_file)
 
     return specials
+
+steam_specials()
