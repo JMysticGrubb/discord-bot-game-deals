@@ -282,7 +282,9 @@ def get_game_info(base_file, game, specials):
     Gets the information from a game or package on steam
 
     Args:
+        base_file (string): file path to steam's html
         game (int): integer representing a game or packages id
+        specials (array): array of game objects that contains info for each game
 
     Returns:
         None
