@@ -90,13 +90,15 @@ async def freethisweek(ctx):
         if game.game_image:
             embed.set_image(url=game.game_image)
 
+        embed.add_field(name="Original Price:", value=game.original_price, inline=True)
+
         embed.url = game.game_url
 
         await ctx.send(embed=embed)
 
     return
 
-@tasks.loop(hours=168, minutes=0, tzinfo=datetime.timezone.utc)
+@tasks.loop(hours=168, minutes=0)
 async def free_games_weekly_post():
     if datetime.datetime.now(datetime.timezone.utc).weekday() == 3: # Only posts on Thursdays (when the new free games are out)
         channel = bot.get_channel(CHANNEL_ID)
