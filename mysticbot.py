@@ -42,31 +42,39 @@ async def specials(ctx):
             embed.set_image(url=game.game_image)
 
         embed.add_field(name="Original Price", value=game.original_price, inline=True)
-        embed.add_field(name="Discount", value=game.discount, inline=True)
-        embed.add_field(name="Dicounted Price", value=game.discounted_price, inline=True)
+        embed.add_field(name="Discount Percent", value=game.discount_percent, inline=True)
+        embed.add_field(name="Dicount Price", value=game.discount_price, inline=True)
 
-        match = re.search(r"(\d+)\%", game.monthly_ratings)
-        rating_score = int(match.group(1))
+        if game.monthly_ratings != None:
+            match = re.search(r"(\d+)\%", game.monthly_ratings)
+            rating_score = int(match.group(1))
+        else:
+            rating_score = -1
 
         if (rating_score > 80):
             embed.add_field(name="Monthly Ratings👍", value=f"{game.monthly_ratings}", inline=False)
         elif (rating_score > 50):
             embed.add_field(name="Monthly Ratings😑", value=f"{game.monthly_ratings}", inline=False)
-        else:
+        elif (rating_score >= 0 and rating_score <= 50):
             embed.add_field(name="Monthly Ratings👎", value=f"{game.monthly_ratings}", inline=False)
+            
 
-        match = re.search(r"(\d+)\%", game.monthly_ratings)
-        rating_score = int(match.group(1))
+        if game.all_ratings != None:
+            match = re.search(r"(\d+)\%", game.all_ratings)
+            rating_score = int(match.group(1))
+        else:
+            rating_score = -1
 
         if (rating_score > 80):
             embed.add_field(name="Overall Ratings👍", value=f"{game.all_ratings}", inline=False)
         elif (rating_score > 50):
             embed.add_field(name="Overall Ratings😑", value=f"{game.all_ratings}", inline=False)
-        else:
+        elif (rating_score >= 0 and rating_score <= 50):
             embed.add_field(name="Overall Ratings👎", value=f"{game.all_ratings}", inline=False)
 
-        tags_string = ", ".join(game.tags)
-        embed.add_field(name="Tags🏷️", value=tags_string, inline=False)
+        if game.tags:
+            tags_string = ", ".join(game.tags)
+            embed.add_field(name="Tags🏷️", value=tags_string, inline=False)
 
         embed.url = game.game_url
 

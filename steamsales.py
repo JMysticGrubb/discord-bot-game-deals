@@ -1,11 +1,10 @@
 #steamsales.py
 
-from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import re
 from decouple import config
-import os
 import threading
+import requests
 
 class GameInfo:
     title = None
@@ -14,77 +13,22 @@ class GameInfo:
     monthly_ratings = None
     all_ratings = None
     original_price = None
-    discount = None
-    discounted_price = None
+    discount_percent = None
+    discount_price = None
     game_url = None
     game_image = None
 
-    def __init__(self, title, description, tags, monthly_ratings, all_ratings, original_price, discount, discounted_price, game_url, game_image):
+    def __init__(self, title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image):
         self.title = title
         self.description = description
         self.tags = tags
         self.monthly_ratings = monthly_ratings
         self.all_ratings = all_ratings
         self.original_price = original_price
-        self.discount = discount
-        self.discounted_price = discounted_price
+        self.discount_percent = discount_percent
+        self.discount_price = discount_price
         self.game_url = game_url
         self.game_image = game_image
-
-
-
-def last_substring_file(file, substring):
-    '''
-    Finds the last occurrence of a substring
-
-    Args:
-        file (string): The path to a file
-        substring (string): the string we are looking for
-
-    Returns:
-        last_line (int): the line where the last occurrence was found
-        last_index (int): The last index of the substring on the last line
-    '''
-    last_index_found = -1
-    line_number_of_last_occurrence = -1
-
-    with open(file, 'r', encoding="utf-8") as f:
-        for i, line in enumerate(f):
-            try:
-                current_index = line.rindex(substring)
-                last_index_found = current_index
-                line_number_of_last_occurrence = i
-            except ValueError:
-                pass
-
-    if last_index_found != -1:
-        last_line = line_number_of_last_occurrence
-        last_index = last_index_found
-    else:
-        print("Error: Substring could not be found")
-
-    return last_line, last_index
-
-
-
-def find_occurence(text, substring, occurrence, start_point):
-    '''
-    Finds the nth occurrence of a substring in a text
-
-    Args:
-        text (string): The text to search through
-        substring (string): the string we are looking for
-        occurrence (int): The nth occurrence we are looking for
-        start_point (int): The starting index to start search
-
-    Returns:
-        start (int): returns the index of the nth occurrence
-    '''
-    start = text.find(substring, start_point)
-    while start >= 0 and occurrence > 1:
-        start = text.find(substring, start + 1)
-        occurrence -= 1
-    return start
 
 
 
@@ -93,10 +37,10 @@ def flatten_list(list):
     Flattens the list so that it is not pair based
 
     Args:
-        list (array): The array to flatten
+        list (Array): The array to flatten
 
     Returns:
-        flatlist (array): The array 
+        flatlist (Array): The array 
     '''
     flatlist = []
     for item1, item2 in list:
@@ -109,197 +53,245 @@ def flatten_list(list):
 
 
 
-def retrieve_top_5(file, last_line, last_index):
+def retrieve_top_5(javascript):
     '''
     Finds the top 5 games in the specials category on steam
 
     Args:
-        file (string): The path to a file
-        last_line (int): The integer value of the line containing the last occurrence of a string
-        last_index (int): The integer value of the last occurence of a string on the last_line
+        javascript (String): A string of the javascript section that contains the specials
 
     Returns:
-        top5_games (array of strings): The array of the game ids for the top 5 games on steam
+        top5_games (Array of Strings): The array of the game ids for the top 5 games on steam
     '''
-    with open(file, 'r', encoding="utf-8") as f:
-        for i, line in enumerate(f):
-            try:
-                if i == last_line:
-                    top5_games = line[last_index:find_occurence(line, ",", 5, last_index)]
-                    top5_games = re.findall(r'"appid":(\d+)|"packageid":(\d+)', top5_games)
-            except:
-                pass
+    top5_games = []
+
+    specials_match = re.search(r'"specials":(\[.*?\])', javascript)
+    specials_string = specials_match.group(1)
+    all_ids = re.findall(r'"appid":(\d+)|"packageid":(\d+)', specials_string)
+    top5_games = all_ids[:5]
+
     return top5_games
 
 
 
-def get_game_link(file, gameid):
+def get_game_link(soup, gameid):
     '''
     Finds information based on the gameid or packageid
 
     Args:
-        file (string): The file to search through
-        gameid (string): A string of integers for the game or package that we want information on
+        soup (Object): A BeautifulSoup object containing the html for the game
+        gameid (String): A string of integers for the game or package that we want information on
 
     Returns:
-        gamelink (string): returns a string containing a link to the javascript for the game or package page
+        gamelink (String): returns a string containing a link to the javascript for the game or package page
+        is_game (Boolean): returns a boolean indicating if it is a game or package
     '''
     is_game = True
-    with open(file, 'r', encoding="utf-8") as f:
-        filecontent = f.read()
-        match = re.search(r"https://store.steampowered.com/app/" + gameid + r"/([^\"]+)", filecontent)
-        if match == None:
-            match = re.search(r"https://store.steampowered.com/sub/" + gameid + r"/([^\"]+)", filecontent)
-            is_game = False
-        game_link = match.group(1) # Extracts the part of the captured link
-        if is_game:
-            game_link = "https://store.steampowered.com/app/" + gameid + "/" + game_link # Concatenates the latter part of the link with the start
-        else:
-            game_link = "https://store.steampowered.com/sub/" + gameid + "/" + game_link # Concatenates the latter part of the link with the start
 
-    return game_link
+    match = re.search(r"https://store.steampowered.com/app/" + gameid + r"/([^\"]+)", soup)
+    if match == None:
+        match = re.search(r"https://store.steampowered.com/sub/" + gameid + r"/([^\"]+)", soup)
+        is_game = False
+    game_link = match.group(1) # Extracts the part of the captured link
+    if is_game:
+        game_link = "https://store.steampowered.com/app/" + gameid + "/" + game_link # Concatenates the latter part of the link with the start
+    else:
+        game_link = "https://store.steampowered.com/sub/" + gameid + "/" + game_link # Concatenates the latter part of the link with the start
 
+    return game_link, is_game
 
 
-def get_game_html(game_link):
+
+def get_game_html(game_link, is_game):
     '''
     Creates a text file with the html for a game or package's webpage
 
     Args:
-        game_link (string): A link to the html of a webpage
+        game_link (String): A link to the html of a webpage
+        is_game (Boolean): A boolean indicating if it is a game or package
 
     Returns:
-        game_file (string): Returns the name of the file for the games html
+        url_content (String): Returns a string that has the url for the game
+        soup (Object): Returns a BeautfifulSoup object for the game's html
     '''
     url = game_link
-    page = urlopen(url)
+    response = requests.get(url) # open the url and get the HTTPResponse
 
-    html_bytes = page.read()
-    html = html_bytes.decode("utf-8")
+    html = response.text
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    if is_game:
+        meta_tag = soup.find('meta', property='og:url')
 
-    match = re.search(r"https://store.steampowered.com/app/\d+/([^/?]+)", game_link)
-    if match == None:
-        match = re.search(r"https://store.steampowered.com/sub/(\d+)", game_link)
-    game_file = match.group(1)
+        if meta_tag:
+            url_content = meta_tag['content']
 
-    with open(game_file, "w", encoding="utf-8") as f:
-        f.write(html)
+    else:
+        url_content = game_link.split('?')[0]
 
-    return game_file
+    return url_content, soup
 
 
 
-def get_game_description(game_link):
+def get_game_title(soup, game_url, is_game):
+    '''
+    Gets the title for a steam game
+
+    Args:
+        soup (Object): A BeautifulSoup object containing the html for the game
+        game_url (String): A string that has the url for the game
+        is_game (Boolean): A boolean indicating if it is a game or package
+
+    Returns:
+        title (String): String for the title of a game
+    '''
+    if is_game:
+        match = re.search(r"/\d+/(\w+/?)/", game_url)
+        title = match.group(1).replace('_', ' ').title()
+    else:
+        title_container = soup.find('h2', class_='pageheader')
+        
+        if title_container:
+            title = title_container.get_text()
+
+    return title
+
+
+
+def get_game_description(soup):
     '''
     Gets the description for a steam game
 
     Args:
-        game_link (string): A link to the html of a game's webpage
+        soup (Object): A BeautifulSoup object containing the html for the game
 
     Returns:
-        game_description (string): Returns the description of the game
+        game_description (String): Returns the description of the game
     '''
-    with open(game_link, "r", encoding="utf-8") as f:
-        filecontent = f.read()
-        match = re.search(r"meta name=\"Description\" content=\"(.*?)\"", filecontent)
-        game_description = match.group(1)
+    meta_tag = soup.find('meta', property='og:description')
+
+    if meta_tag:
+        game_description = meta_tag['content']
     
     return game_description
 
 
 
-def get_game_tags(game_link):
+def get_game_tags(soup):
     '''
     Gets the tags for a steam game
 
     Args:
-        game_link (string): A link to the html of a game's webpage
+        soup (Object): A BeautifulSoup object containing the html for the game
 
     Returns:
-        game_tags (string): Returns the description of the game
+        game_tags (String): Returns the description of the game
     '''
     game_tags = []
-    with open(game_link, "r", encoding="utf-8") as f:
-        for index, line in enumerate(f):
-            match = re.search(r"\s(.*?)\s+</a><a href=\"https://store.steampowered.com/tags", line)
-            if match == None:
-                continue
-            else:
-                game_tags.append(match.group(1).strip())
+    tags_container = soup.find('div', class_=['glance_tags', 'popular_tags'])
+
+    if tags_container:
+        tag_links = tags_container.find_all('a', class_='app_tag')
+
+        game_tags = [tag.get_text().strip() for tag in tag_links]
+
     return game_tags
 
 
 
-def get_game_ratings(game_link):
+def get_game_ratings(soup, is_game):
     '''
     Gets the monthly and overall ratings for a steam game
 
     Args:
-        game_link (string): A link to the html of a game's webpage
+        soup (Object): A BeautifulSoup object containing the html for the game
+        is_game (Boolean): A boolean indicating if it is a game or package
 
     Returns:
-        monthly_ratings (string): Returns the monthly ratings for the game
-        all_ratings (string): Returns the overall ratings for the game
+        monthly_ratings (String): Returns the monthly ratings for the game
+        all_ratings (String): Returns the overall ratings for the game
     '''
-    with open(game_link, "r", encoding="utf-8") as f:
-        filecontent = f.read()
-        ratings = re.findall(r"<a class=\"user_reviews_summary_row\" href=\"\#app_reviews_hash\" data-tooltip-html=\"(.*?\.)", filecontent)
-        monthly_ratings = ratings[0]
-        all_ratings = ratings[1]
+    if is_game:
+        reviews_container = soup.find(id='userReviews')
+
+        if reviews_container:
+            review_links = reviews_container.find_all('a', class_='user_reviews_summary_row')
+        
+            monthly_ratings = review_links[0]['data-tooltip-html'].strip()
+            all_ratings = review_links[1]['data-tooltip-html'].strip()
+    else:
+        monthly_ratings = None
+        all_ratings = None
+
     return monthly_ratings, all_ratings
 
 
 
-def get_game_price(game_link):
+def get_game_price(soup):
     '''
     Gets the pricing information for a steam game
 
     Args:
-        game_link (string): A link to the html of a game's webpage
+        soup (Object): A BeautifulSoup object containing the html for the game
 
     Returns:
-        discount_percent (string): Returns the percentage of the discount for the game
-        original_price (string): Returns the original price of the game
-        discount_price (string): Returns the discounted price of the game
+        discount_percent (String): Returns the percentage of the discount for the game
+        original_price (String): Returns the original price of the game
+        discount_price (String): Returns the discounted price of the game
     '''
-    with open(game_link, "r", encoding="utf-8") as f:
-        filecontent = f.read()
-        match = re.search(r"<div class=\"discount_block game_purchase_discount\".*?aria-label=\"(\d+%) off. (\$\d+\.\d+) normally, discounted to (\$\d+\.\d+)\"", filecontent)
-        discount_percent = match.group(1)
-        original_price = match.group(2)
-        discount_price = match.group(3)
+    price_container = soup.find('div', class_='discount_block game_purchase_discount')
+
+    if price_container:
+        discount = price_container['aria-label']
+    
+    match = re.search(r'(\d+%) off. (\$\d+\.\d+) normally, discounted to (\$\d+\.\d+)', discount)
+    discount_percent = match.group(1)
+    original_price = match.group(2)
+    discount_price = match.group(3)
+
     return discount_percent, original_price, discount_price
 
-def get_game_image(game_link):
-    with open(game_link, "r", encoding="utf-8") as f:
-        filecontent = f.read()
-        match = re.search(r"<link rel=\"image_src\" href=\"(.*?)\"", filecontent)
-        game_image = match.group(1)
+def get_game_image(soup):
+    '''
+    Gets the image for a steam game
+
+    Args:
+        soup (Object): A BeautifulSoup object containing the html for the game
+
+    Returns:
+        game_image (String): String for the image of a game
+    '''
+
+    game_image_container = soup.find('link', rel="image_src")
+
+    if game_image_container:
+        game_image = game_image_container['href']
+
     return game_image
 
-def get_game_info(base_file, game, specials):
+
+
+def get_game_info(soup, game, specials):
     '''
     Gets the information from a game or package on steam
 
     Args:
-        base_file (string): file path to steam's html
+        soup (Object): A BeautifulSoup object containing the html for the game
         game (int): integer representing a game or packages id
         specials (array): array of game objects that contains info for each game
 
     Returns:
         None
     '''
-    game_link = get_game_link(base_file, game)
-    game_file = get_game_html(game_link)
-    title = str(game_file)
-    description = get_game_description(game_file)
-    tags = get_game_tags(game_file)
+    game_link, is_game = get_game_link(soup, game)
+    game_url, soup = get_game_html(game_link, is_game)
+    title = get_game_title(soup, game_url, is_game)
+    description = get_game_description(soup)
+    tags = get_game_tags(soup)
     tags = [tag for tag in tags if tag.strip()]
-    monthly_ratings, all_ratings = get_game_ratings(game_file)
-    discount_percent, original_price, discount_price = get_game_price(game_file)
-    match = re.search(rf"(.*?{title}/)", game_link)
-    game_url = match.group(1)
-    game_image = get_game_image(game_file)
+    monthly_ratings, all_ratings = get_game_ratings(soup, is_game)
+    discount_percent, original_price, discount_price = get_game_price(soup)
+    game_image = get_game_image(soup)
     game = GameInfo(title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image)
     specials.append(game)
 
@@ -309,26 +301,31 @@ def get_game_info(base_file, game, specials):
 
 def steam_specials():
     url = "https://store.steampowered.com/?snr=1_4_4__global-responsive-menu" # get the url
-    page = urlopen(url) # open the url and get the HTTPResponse
+    response = requests.get(url) # open the url and get the HTTPResponse
 
-    html_bytes = page.read() # retrieves the bytes of information
-    html = html_bytes.decode("utf-8") # turns the html_bytes into readable html
-    soup = BeautifulSoup(html, 'html.parser')
+    html = response.text # Turn the HTTPResponse into html text
+    soup = BeautifulSoup(html, 'html.parser') # Parse the html
+    soup_string = str(soup) # Create a string version of the BeautifulSoup object
 
-    base_file = "html_steam" # Set the file path to the same directory as program but the file html_steam
+    #base_file = "html_steam" # Set the file path to the same directory as program but the file html_steam
 
     # write the html into a file and start looking for data
-    with open(base_file, "w", encoding="utf-8") as f:
-        f.write(soup.prettify())
+    '''with open(base_file, "w", encoding="utf-8") as f:
+        f.write(soup.prettify())'''
 
-    last_line, last_index = last_substring_file(base_file, "specials") # Find the line and index of the last occurence of "specials"
-    top5_games = retrieve_top_5(base_file, last_line, last_index)
+    script_tags = soup.find_all('script')
+
+    specials_javascript = script_tags[len(script_tags)-1]
+    specials_string = specials_javascript.string
+
+    top5_games = retrieve_top_5(specials_string)
+
     top5_games = flatten_list(top5_games)
     specials = []
     threads = []
 
     for game in top5_games:
-        t = threading.Thread(target=get_game_info, args=(base_file, game, specials))
+        t = threading.Thread(target=get_game_info, args=(soup_string, game, specials))
         threads.append(t)
 
     for t in threads:
@@ -336,10 +333,5 @@ def steam_specials():
 
     for t in threads:
         t.join()
-
-    for game in top5_games:
-        game_link = get_game_link(base_file, game)
-        game_file = get_game_html(game_link)
-        os.remove(game_file)
 
     return specials
