@@ -98,6 +98,11 @@ async def specials(ctx):
         if game.game_image:
             embed.set_image(url=game.game_image)
 
+        embed.add_field(name="Developer", value=game.game_developer, inline=True)
+        embed.add_field(name="Publisher", value=game.game_publisher, inline=True)
+
+        embed.add_field(name="", value="", inline=True)
+
         embed.add_field(name="Original Price", value=game.original_price, inline=True)
         embed.add_field(name="Discount Percent", value=game.discount_percent, inline=True)
         embed.add_field(name="Dicount Price", value=game.discount_price, inline=True)
