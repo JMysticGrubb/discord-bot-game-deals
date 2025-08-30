@@ -39,3 +39,14 @@ def create_user(discord_id, first_seen, last_online, playstyle):
     finally:
         if conn:
             conn.close()
+
+def update_user(discord_id, last_online, playstyle):
+    try:
+        conn = connect_db()
+        conn.execute("UPDATE user SET last_online=?, playstyle=? where discord_id=?", (last_online, playstyle, discord_id,))
+        conn.commit()
+    except sqlite3.Error as e:
+        raise e
+    finally:
+        if conn:
+            conn.close()
