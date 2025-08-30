@@ -30,6 +30,18 @@ def user_exists(discord_id):
     return exists
 
 def create_user(discord_id, first_seen, last_online, playstyle):
+    '''
+    Inserts information for a new user into the database
+    
+    Args:
+        discord_id (int): The integer number that is a users discord id
+        first_seen (string): The date the user's profile is created YYYY-MM-DD
+        last_online (string): The date the user's profile is last seen YYYY-MM-DD
+        playstyle (string): The playstyle of the player ("casual", "competitive", "mix)
+
+    Returns:
+        None
+    '''
     try:
         conn = connect_db()
         conn.execute("INSERT into user values (?,?,?,?)", (discord_id, first_seen, last_online, playstyle,))
@@ -41,6 +53,17 @@ def create_user(discord_id, first_seen, last_online, playstyle):
             conn.close()
 
 def update_user(discord_id, last_online, playstyle):
+    '''
+    Updates a user's information in the database
+    
+    Args:
+        discord_id (int): The integer number that is a users discord id
+        last_online (string): The date the user's profile is last seen or updated YYYY-MM-DD
+        playstyle (string): The playstyle of the player ("casual", "competitive", "mix)
+
+    Returns:
+        None
+    '''
     try:
         conn = connect_db()
         conn.execute("UPDATE user SET last_online=?, playstyle=? where discord_id=?", (last_online, playstyle, discord_id,))
