@@ -17,8 +17,10 @@ class GameInfo:
     discount_price = None
     game_url = None
     game_image = None
+    game_developer = None
+    game_publisher = None
 
-    def __init__(self, title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image):
+    def __init__(self, title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher):
         self.title = title
         self.description = description
         self.tags = tags
@@ -29,6 +31,8 @@ class GameInfo:
         self.discount_price = discount_price
         self.game_url = game_url
         self.game_image = game_image
+        self.game_developer = game_developer
+        self.game_publisher = game_publisher
 
 
 
@@ -251,6 +255,8 @@ def get_game_price(soup):
 
     return discount_percent, original_price, discount_price
 
+
+
 def get_game_image(soup):
     '''
     Gets the image for a steam game
@@ -268,6 +274,48 @@ def get_game_image(soup):
         game_image = game_image_container['href']
 
     return game_image
+
+
+
+def get_game_developer(soup):
+    '''
+    Gets the developer for a steam game
+
+    Args:
+        soup (Object): A BeautifulSoup object containing the html for the game
+
+    Returns:
+        game_developer (String): String for the developer of a game
+    '''
+    developer_container = soup.find(id='developers_list')
+
+    if developer_container:
+            game_developer = developer_container.find('a')
+            game_developer = game_developer.text.strip()
+
+    return game_developer
+
+
+
+def get_game_publisher(soup):
+    '''
+    Gets the publisher for a steam game
+
+    Args:
+        soup (Object): A BeautifulSoup object containing the html for the game
+
+    Returns:
+        game_publisher (String): String for the publisher of a game
+    '''
+    dev_rows = soup.find_all('div', class_='dev_row')
+
+    for dev in dev_rows:
+        subtitle = dev.find('div', class_='subtitle column')
+        if subtitle and "Publisher:" in subtitle.text.strip():
+            game_publisher = dev.find('a')
+            game_publisher = game_publisher.text.strip()
+
+    return game_publisher
 
 
 
@@ -292,14 +340,15 @@ def get_game_info(soup, game, specials):
     monthly_ratings, all_ratings = get_game_ratings(soup, is_game)
     discount_percent, original_price, discount_price = get_game_price(soup)
     game_image = get_game_image(soup)
-    game = GameInfo(title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image)
+    game_developer = get_game_developer(soup)
+    game_publisher = get_game_publisher(soup)
+    game = GameInfo(title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher)
     specials.append(game)
 
-'''
-# steamsales.py scrapes data from the top sellers section in the specials category on the steam store page.
-'''
+
 
 def steam_specials():
+    '''Scrapes data from the top 5 sellers in the specials category on the steam store page'''
     url = "https://store.steampowered.com/?snr=1_4_4__global-responsive-menu" # get the url
     response = requests.get(url) # open the url and get the HTTPResponse
 
@@ -309,7 +358,7 @@ def steam_specials():
 
     #base_file = "html_steam" # Set the file path to the same directory as program but the file html_steam
 
-    # write the html into a file and start looking for data
+    # write the html into a file
     '''with open(base_file, "w", encoding="utf-8") as f:
         f.write(soup.prettify())'''
 
@@ -335,3 +384,5 @@ def steam_specials():
         t.join()
 
     return specials
+
+steam_specials()
