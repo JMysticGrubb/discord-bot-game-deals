@@ -247,11 +247,23 @@ def get_game_price(soup):
 
     if price_container:
         discount = price_container['aria-label']
+    else:
+        discount = None
     
-    match = re.search(r'(\d+%) off. (\$\d+\.\d+) normally, discounted to (\$\d+\.\d+)', discount)
-    discount_percent = match.group(1)
-    original_price = match.group(2)
-    discount_price = match.group(3)
+    if discount:
+        match = re.search(r'(\d+%) off. (\$\d+\.\d+) normally, discounted to (\$\d+\.\d+)', discount)
+        discount_percent = match.group(1)
+        original_price = match.group(2)
+        discount_price = match.group(3)
+    else:
+        discount_percent = None
+        original_price = None
+        discount_price = None
+
+    if original_price == None:
+        price_container = soup.find('meta', itemprop = 'price')
+        if price_container:
+            original_price = price_container['content']
 
     return discount_percent, original_price, discount_price
 
@@ -345,6 +357,35 @@ def get_game_info(soup, game, specials):
     game = GameInfo(title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher)
     specials.append(game)
 
+def game_search(game_url):
+    '''
+    Gets game information given a link to a steam game page
+
+    Args:
+        game_url (string): string containing the link to a steam game page
+
+    Returns:
+        game (object): returns a game object containing information on the game
+    '''
+    url = game_url
+    response = requests.get(url)
+
+    html = response.text
+    soup = BeautifulSoup(html, 'html.parser')
+    is_game = True
+
+    title = get_game_title(soup, game_url, is_game)
+    description = get_game_description(soup)
+    tags = get_game_tags(soup)
+    tags = [tag for tag in tags if tag.strip()]
+    monthly_ratings, all_ratings = get_game_ratings(soup, is_game)
+    discount_percent, original_price, discount_price = get_game_price(soup)
+    game_image = get_game_image(soup)
+    game_developer = get_game_developer(soup)
+    game_publisher = get_game_publisher(soup)
+    game = GameInfo(title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher)
+    
+    return game
 
 
 def steam_specials():
@@ -384,5 +425,3 @@ def steam_specials():
         t.join()
 
     return specials
-
-steam_specials()
