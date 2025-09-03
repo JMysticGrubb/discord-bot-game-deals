@@ -5,34 +5,44 @@ import re
 from decouple import config
 import threading
 import requests
+import datetime
+import db_manager
 
 class GameInfo:
+    id = None
     title = None
     description = None
     tags = None
     monthly_ratings = None
     all_ratings = None
     original_price = None
+    is_on_sale = None
+    end_date = None
     discount_percent = None
     discount_price = None
     game_url = None
     game_image = None
     game_developer = None
     game_publisher = None
+    scrape_date = None
 
-    def __init__(self, title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher):
+    def __init__(self, id, title, description, tags, monthly_ratings, all_ratings, original_price, is_on_sale, end_date, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher, scrape_date):
+        self.id = id
         self.title = title
         self.description = description
         self.tags = tags
         self.monthly_ratings = monthly_ratings
         self.all_ratings = all_ratings
         self.original_price = original_price
+        self.is_on_sale = is_on_sale
+        self.end_date = end_date
         self.discount_percent = discount_percent
         self.discount_price = discount_price
         self.game_url = game_url
         self.game_image = game_image
         self.game_developer = game_developer
         self.game_publisher = game_publisher
+        self.scrape_date = scrape_date
 
 
 
@@ -251,7 +261,7 @@ def get_game_price(soup):
         discount = None
     
     if discount:
-        match = re.search(r'(\d+%) off. (\$\d+\.\d+) normally, discounted to (\$\d+\.\d+)', discount)
+        match = re.search(r'(\d+%) off. (\$\d+\.\d+) normally, discounted to $(\d+\.\d+)', discount)
         discount_percent = match.group(1)
         original_price = match.group(2)
         discount_price = match.group(3)
@@ -330,6 +340,29 @@ def get_game_publisher(soup):
     return game_publisher
 
 
+def get_sale_end_date(soup):
+    '''
+    Gets the end date for a sale on a game
+
+    Args:
+        soup (Object): A BeautifulSoup object containing the html for the game
+
+    Returns:
+        end_date (String): String for the end date of a sale in the format YYYY-MM-DD
+    '''
+    end_date_container = soup.find('p', class_='game_purchase_discount_countdown')
+    if end_date_container:
+        end_date = end_date_container.text.strip()
+        match = re.search(r"Offer ends (\S+) (\d+)",end_date)
+        if match:
+            end_date = f"{datetime.datetime.now().year}-{str(datetime.datetime.strptime(match.group(1), "%B").month).zfill(2)}-{str(match.group(2).zfill(2))}"
+        else:
+            end_date = None
+    else:
+        end_date = None
+
+    return end_date
+
 
 def get_game_info(soup, game, specials):
     '''
@@ -343,6 +376,8 @@ def get_game_info(soup, game, specials):
     Returns:
         None
     '''
+    id = game
+    is_on_sale = False
     game_link, is_game = get_game_link(soup, game)
     game_url, soup = get_game_html(game_link, is_game)
     title = get_game_title(soup, game_url, is_game)
@@ -351,10 +386,15 @@ def get_game_info(soup, game, specials):
     tags = [tag for tag in tags if tag.strip()]
     monthly_ratings, all_ratings = get_game_ratings(soup, is_game)
     discount_percent, original_price, discount_price = get_game_price(soup)
+    if (discount_price != None):
+        is_on_sale = True
+    if (is_on_sale):
+        end_date = get_sale_end_date(soup)
     game_image = get_game_image(soup)
     game_developer = get_game_developer(soup)
     game_publisher = get_game_publisher(soup)
-    game = GameInfo(title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher)
+    scrape_date = datetime.date.today().strftime("%Y-%m-%d")
+    game = GameInfo(id, title, description, tags, monthly_ratings, all_ratings, original_price, is_on_sale, end_date, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher, scrape_date)
     specials.append(game)
 
 def game_search(game_url):
@@ -374,16 +414,30 @@ def game_search(game_url):
     soup = BeautifulSoup(html, 'html.parser')
     is_game = True
 
+    match = re.search(r"https://store.steampowered.com/app/(\d+)/", url)
+    if match == None:
+        match = re.search(r"https://store.steampowered.com/sub/(\d+)/", url)
+        is_game = False
+    
+    id = match.group(1)
+    is_on_sale = False
     title = get_game_title(soup, game_url, is_game)
     description = get_game_description(soup)
     tags = get_game_tags(soup)
     tags = [tag for tag in tags if tag.strip()]
     monthly_ratings, all_ratings = get_game_ratings(soup, is_game)
     discount_percent, original_price, discount_price = get_game_price(soup)
+    if (discount_price != None):
+        is_on_sale = True
+    if (is_on_sale):
+        end_date = get_sale_end_date(soup)
+    else:
+        end_date = None
     game_image = get_game_image(soup)
     game_developer = get_game_developer(soup)
     game_publisher = get_game_publisher(soup)
-    game = GameInfo(title, description, tags, monthly_ratings, all_ratings, original_price, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher)
+    scrape_date = datetime.date.today().strftime("%Y-%m-%d")
+    game = GameInfo(id, title, description, tags, monthly_ratings, all_ratings, original_price, is_on_sale, end_date, discount_percent, discount_price, game_url, game_image, game_developer, game_publisher, scrape_date)
     
     return game
 

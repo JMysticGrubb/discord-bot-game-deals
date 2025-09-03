@@ -21,14 +21,28 @@ bot = commands.Bot(command_prefix="-", intents=discord.Intents.all())
 @bot.event
 async def on_ready():
     channel = bot.get_channel(CHANNEL_ID)
+    logging.basicConfig(filename='mysticbot.log', level=logging.INFO)
     embed = discord.Embed(
         title="Mystic Bot",
-        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -freethisweek: Displays information on the games that can be redeemed for free on Epic Games.\n -profile: Create a profile that tracks your games and ratings\n -help: shows all bot commands.",
+        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -freethisweek: Displays information on the games that can be redeemed for free on Epic Games.\n -profile: Create a profile that tracks your games and ratings\n -addgame (steam game link) (rating out of 10): Add a game to the database with your user rating out of 10\n -help: shows all bot commands.",
         color=discord.Color.red()
     )
     await channel.send(embed=embed)
     if not free_games_weekly_post.is_running():
         free_games_weekly_post.start()
+
+@bot.command()
+async def addgame(ctx, game_link, rating):
+    try:
+        game = steamsales.game_search(game_link)
+        game_exists = db_manager.game_exists(game.id)
+        #rating_exists = db_manager.rating_exists(ctx.author.id)
+        if game_exists == False:
+            db_manager.add_game(game, rating)
+        #else if :
+    except Exception as e:
+        await ctx.send(f"Could not find game information for the link: {game_link}")
+        await ctx.send(e)
 
 @bot.command()
 async def profile(ctx):
@@ -103,7 +117,7 @@ async def specials(ctx):
 
         embed.add_field(name="", value="", inline=True)
 
-        embed.add_field(name="Original Price", value=game.original_price, inline=True)
+        embed.add_field(name="Original Price", value=f"${game.original_price}", inline=True)
         embed.add_field(name="Discount Percent", value=game.discount_percent, inline=True)
         embed.add_field(name="Dicount Price", value=game.discount_price, inline=True)
 
@@ -170,7 +184,7 @@ async def freethisweek(ctx):
 
 @tasks.loop(hours=168, minutes=0)
 async def free_games_weekly_post():
-    if datetime.datetime.now(datetime.timezone.utc).weekday() == 4: # Only posts on Thursdays (when the new free games are out)
+    if datetime.datetime.now(datetime.timezone.utc).weekday() == 4 and datetime.datetime.now(datetime.timezone.utc).hour >= 15: # Only posts on Thursdays after 10am (when the new free games are out)
         channel = bot.get_channel(CHANNEL_ID)
         await freethisweek(channel)
 
