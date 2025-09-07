@@ -31,6 +31,30 @@ def tag_exists(tag):
             conn.close()
     return exists
 
+def rating_exists(discord_id, game_id):
+    '''
+    Checks if a discord user had already inputed a rating for a game
+    
+    Args:
+        discord_id (int): integer value for a user's discord id
+        game_id (int): integer value for a game's id
+
+    Returns:
+        exists (boolean): True or false value indicating if a users rating for a game is in the database
+    '''
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM user_activity WHERE discord_id = ? and game_id = ?", (discord_id, game_id,))
+        exists = cursor.fetchone() is not None
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise e
+    finally:
+        if conn:
+            conn.close()
+    return exists
+
 def game_exists(game_id):
     '''
     Checks if a game's ID is in the database
@@ -44,7 +68,7 @@ def game_exists(game_id):
     try:
         conn = connect_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT 1 FROM User WHERE discord_id = ?", (game_id,))
+        cursor.execute("SELECT 1 FROM game WHERE game_id = ?", (game_id,))
         exists = cursor.fetchone() is not None
     except sqlite3.Error as e:
         conn.rollback()
@@ -54,13 +78,16 @@ def game_exists(game_id):
             conn.close()
     return exists
 
-def add_game(game, rating):
+def add_game(game, rating, activity_type, timestamp, discord_id):
     '''
     Adds a game to the database
     
     Args:
         game (object): game object containing information about the game (made in steamsales.py)
         rating (string): user rating on a scale from 1 to 10
+        activity_type (string): user indicated interaction with the game (playing, completed, dropped)
+        timestamp (string): datetime that the user provided a rating and activity_type of format: YYYY-MM-DD
+        discord_id (int): integer for the user's discord id
 
     Returns:
         None
@@ -107,6 +134,7 @@ def add_game(game, rating):
                 cursor.execute("INSERT into tag (tag_name) values (?)", (tag,))
                 tag_id = cursor.lastrowid
                 cursor.execute("INSERT into game_tag (game_id, tag_id) values (?,?)", (game.id, tag_id,))
+        cursor.execute("INSERT into user_activity (discord_id, game_id, activity_type, rating, timestamp) values (?,?,?,?,?)", (discord_id, game.id, activity_type, rating, timestamp,))
         conn.commit()
     except sqlite3.Error as e:
         conn.rollback()

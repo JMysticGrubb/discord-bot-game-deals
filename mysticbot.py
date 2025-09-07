@@ -9,14 +9,16 @@ import steamsales
 import epicgamesfree
 import db_manager
 import logging
+import errors
 
 BOT_TOKEN = config('BOT_TOKEN', None)
 CHANNEL_ID = int(config('CHANNEL_ID', None))
 THUMBS_UP = '👍'
 THUMBS_DOWN = '👎'
 PLAYSTYLE_OPTIONS = ('casual', 'competitive', 'mix')
+ACTIVITY_TYPES = ('playing', 'completed', 'dropped')
 
-bot = commands.Bot(command_prefix="-", intents=discord.Intents.all())
+bot = commands.Bot(command_prefix="-", intents=discord.Intents.all(), help_command=commands.DefaultHelpCommand(show_parameter_descriptions=False))
 
 @bot.event
 async def on_ready():
@@ -31,15 +33,40 @@ async def on_ready():
     if not free_games_weekly_post.is_running():
         free_games_weekly_post.start()
 
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("You did not provide the nescessary arguments!\nUse -help for more information on a command and how to use it.")
+
 @bot.command()
-async def addgame(ctx, game_link, rating):
+async def addgame(ctx, game_link, rating, activity_type):
+    '''
+    Adds a game to your profile with your rating and activity type
+    Format: -addgame (steamlink) (rating out of 10) (playing/completed/dropped)
+    Ex: -addgame https://store.steampowered.com/app/292140/FINAL_FANTASY_XIII2/ 9 completed
+    '''
     try:
+        discord_id = int(ctx.author.id)
+        if db_manager.user_exists(discord_id) == False:
+            raise errors.UserDoesNotExist(f"A user associated with id: {discord_id} does not exist. Please set up a profile using the -profile command.")
         game = steamsales.game_search(game_link)
         game_exists = db_manager.game_exists(game.id)
         #rating_exists = db_manager.rating_exists(ctx.author.id)
+        timestamp = datetime.date.today().strftime("%Y-%m-%d")
+        if activity_type not in ACTIVITY_TYPES:
+            raise ValueError("The input for activity_type is not valid. It must be: \"playing\", \"completed\", or \"dropped\"")
         if game_exists == False:
-            db_manager.add_game(game, rating)
-        #else if :
+            db_manager.add_game(game, rating, activity_type, timestamp, discord_id)
+        #else:
+            #db_manager.update_game(game, rating, activity_type, rating_exists)
+        if activity_type in ("completed", "dropped"):
+            await ctx.send(f"You gave {game.title}, a rating of {rating} out of 10! You have {activity_type} this game.")
+        else:
+            await ctx.send(f"You gave {game.title}, a rating of {rating} out of 10! You are {activity_type} this game.")
+    except errors.UserDoesNotExist as e:
+        await ctx.send(e)
+    except ValueError as e:
+        await ctx.send(e)
     except Exception as e:
         await ctx.send(f"Could not find game information for the link: {game_link}")
         await ctx.send(e)

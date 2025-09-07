@@ -419,7 +419,7 @@ def game_search(game_url):
         match = re.search(r"https://store.steampowered.com/sub/(\d+)/", url)
         is_game = False
     
-    id = match.group(1)
+    id = int(match.group(1))
     is_on_sale = False
     title = get_game_title(soup, game_url, is_game)
     description = get_game_description(soup)
