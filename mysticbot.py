@@ -26,7 +26,7 @@ async def on_ready():
     logging.basicConfig(filename='mysticbot.log', level=logging.INFO)
     embed = discord.Embed(
         title="Mystic Bot",
-        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -freethisweek: Displays information on the games that can be redeemed for free on Epic Games.\n -profile: Create a profile that tracks your games and ratings\n -addgame (steam game link) (rating out of 10): Add a game to the database with your user rating out of 10\n -help: shows all bot commands.",
+        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -freethisweek: Displays information on the games that can be redeemed for free on Epic Games.\n -profile: Create a profile that tracks your games and ratings\n -addgame (steam game link) (rating out of 10) (activity_type: \"playing\", \"completed\", \"dropped\"): Add a game to the database with your user rating out of 10\n -help: shows all bot commands.",
         color=discord.Color.red()
     )
     await channel.send(embed=embed)
