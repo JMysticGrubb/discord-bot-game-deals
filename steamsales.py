@@ -44,6 +44,22 @@ class GameInfo:
         self.game_publisher = game_publisher
         self.scrape_date = scrape_date
 
+    def print_info(self):
+        print(f"Game id: {self.id}")
+        print(f"title: {self.title}")
+        print(f"Description: {self.description}")
+        print(f"Tags: {self.tags}")
+        print(f"Monthly Ratings: {self.monthly_ratings}")
+        print(f"Overall Ratings: {self.all_ratings}")
+        print(f"Original Price: {self.original_price}")
+        print(f"Is on Sale: {self.is_on_sale}")
+        print(f"End date for Sale: {self.end_date}")
+        print(f"Discount Percent: {self.discount_percent}")
+        print(f"Discount Price: {self.discount_price}")
+        print(f"Game's url: {self.game_url}")
+        print(f"Game Developer: {self.game_developer}")
+        print(f"Game Publisher: {self.game_publisher}")
+        print(f"Date scraped: {self.scrape_date}")
 
 
 def flatten_list(list):
@@ -97,7 +113,7 @@ def get_game_link(soup, gameid):
         gameid (String): A string of integers for the game or package that we want information on
 
     Returns:
-        gamelink (String): returns a string containing a link to the javascript for the game or package page
+        gamelink (String): returns a string containing a link to the game or package page
         is_game (Boolean): returns a boolean indicating if it is a game or package
     '''
     is_game = True
@@ -231,8 +247,12 @@ def get_game_ratings(soup, is_game):
         if reviews_container:
             review_links = reviews_container.find_all('a', class_='user_reviews_summary_row')
         
-            monthly_ratings = review_links[0]['data-tooltip-html'].strip()
-            all_ratings = review_links[1]['data-tooltip-html'].strip()
+            if len(review_links) >= 2:
+                monthly_ratings = review_links[0]['data-tooltip-html'].strip()
+                all_ratings = review_links[1]['data-tooltip-html'].strip()
+            else:
+                monthly_ratings = None
+                all_ratings = review_links[0]['data-tooltip-html'].strip()
     else:
         monthly_ratings = None
         all_ratings = None
@@ -253,27 +273,40 @@ def get_game_price(soup):
         original_price (String): Returns the original price of the game
         discount_price (String): Returns the discounted price of the game
     '''
-    price_container = soup.find('div', class_='discount_block game_purchase_discount')
+    game_purchase_container = soup.find('div', class_='game_area_purchase_game_wrapper')
 
-    if price_container:
-        discount = price_container['aria-label']
-    else:
-        discount = None
+    if game_purchase_container:
+        discount_percent_container = game_purchase_container.find('div', class_='discount_pct')
+        if discount_percent_container:
+            discount_percent = discount_percent_container.text.strip()[1:]
+        else:
+            discount_percent = None
     
-    if discount:
-        match = re.search(r'(\d+%) off. (\$\d+\.\d+) normally, discounted to $(\d+\.\d+)', discount)
-        discount_percent = match.group(1)
-        original_price = match.group(2)
-        discount_price = match.group(3)
+        original_price_container = game_purchase_container.find('div', class_='discount_original_price')
+
+        if original_price_container:
+            original_price = original_price_container.text.strip()[1:]
+        else:
+            original_price = None
+
+        discount_price_container = game_purchase_container.find('div', class_='discount_final_price')
+
+        if discount_price_container:
+            discount_price = discount_price_container.text.strip()[1:]
+        else:
+            discount_price = None
+
+        if discount_percent == None:
+            original_price_container = soup.find('div', class_='game_purchase_price price')
+
+            if original_price_container:
+                original_price = original_price_container.text.strip()[1:]
+            else:
+                original_price = None
     else:
         discount_percent = None
         original_price = None
         discount_price = None
-
-    if original_price == None:
-        price_container = soup.find('meta', itemprop = 'price')
-        if price_container:
-            original_price = price_container['content']
 
     return discount_percent, original_price, discount_price
 
@@ -418,7 +451,7 @@ def game_search(game_url):
     if match == None:
         match = re.search(r"https://store.steampowered.com/sub/(\d+)/", url)
         is_game = False
-    
+
     id = int(match.group(1))
     is_on_sale = False
     title = get_game_title(soup, game_url, is_game)
@@ -451,10 +484,10 @@ def steam_specials():
     soup = BeautifulSoup(html, 'html.parser') # Parse the html
     soup_string = str(soup) # Create a string version of the BeautifulSoup object
 
-    #base_file = "html_steam" # Set the file path to the same directory as program but the file html_steam
+    '''base_file = "html_steam" # Set the file path to the same directory as program but the file html_steam
 
     # write the html into a file
-    '''with open(base_file, "w", encoding="utf-8") as f:
+    with open(base_file, "w", encoding="utf-8") as f:
         f.write(soup.prettify())'''
 
     script_tags = soup.find_all('script')
