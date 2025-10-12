@@ -26,7 +26,7 @@ async def on_ready():
     logging.basicConfig(filename='mysticbot.log', level=logging.INFO)
     embed = discord.Embed(
         title="Mystic Bot",
-        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -freethisweek: Displays information on the games that can be redeemed for free on Epic Games.\n -profile: Create a profile that tracks your games and ratings\n -addgame (steam game link) (rating out of 10) (activity_type: \"playing\", \"completed\", \"dropped\"): Add a game to the database with your user rating out of 10\n -help: shows all bot commands.",
+        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -freethisweek: Displays information on the games that can be redeemed for free on Epic Games.\n -profile: Create a profile that tracks your games and ratings\n -rategame (steam game link) (rating out of 10) (activity_type: \"playing\", \"completed\", \"dropped\"): Add a game to the database with your user rating out of 10\n -help: shows all bot commands.",
         color=discord.Color.red()
     )
     await channel.send(embed=embed)
@@ -39,11 +39,21 @@ async def on_command_error(ctx, error):
         await ctx.send("You did not provide the nescessary arguments!\nUse -help for more information on a command and how to use it.")
 
 @bot.command()
-async def addgame(ctx, game_link, rating, activity_type):
+async def ratings(ctx):
+    '''Shows your game ratings if you have any.'''
+    try:
+        discord_id = int(ctx.author.id)
+        if db_manager.user_exists(discord_id) == False:
+            raise errors.UserDoesNotExist(f"A user associated with id: {discord_id} does not exist. Please set up a profile using the -profile command.")
+    except errors.UserDoesNotExist as e:
+        await ctx.send(e)
+
+@bot.command()
+async def rategame(ctx, game_link, rating, activity_type):
     '''
-    Adds a game to your profile with your rating and activity type
-    Format: -addgame (steamlink) (rating out of 10) (playing/completed/dropped)
-    Ex: -addgame https://store.steampowered.com/app/292140/FINAL_FANTASY_XIII2/ 9 completed
+    Adds or updates a game to your profile with your rating and activity type
+    Format: -rategame (steamlink) (rating out of 10) (playing/completed/dropped)
+    Ex: -rategame https://store.steampowered.com/app/292140/FINAL_FANTASY_XIII2/ 9 completed
     '''
     try:
         discord_id = int(ctx.author.id)
@@ -51,14 +61,18 @@ async def addgame(ctx, game_link, rating, activity_type):
             raise errors.UserDoesNotExist(f"A user associated with id: {discord_id} does not exist. Please set up a profile using the -profile command.")
         game = steamsales.game_search(game_link)
         game_exists = db_manager.game_exists(game.id)
-        #rating_exists = db_manager.rating_exists(ctx.author.id)
+        rating_exists = db_manager.rating_exists(ctx.author.id, game.id)
         timestamp = datetime.date.today().strftime("%Y-%m-%d")
         if activity_type not in ACTIVITY_TYPES:
             raise ValueError("The input for activity_type is not valid. It must be: \"playing\", \"completed\", or \"dropped\"")
         if game_exists == False:
-            db_manager.add_game(game, rating, activity_type, timestamp, discord_id)
-        #else:
-            #db_manager.update_game(game, rating, activity_type, rating_exists)
+            db_manager.add_game(game)
+        else:
+            db_manager.update_game(game)
+        if rating_exists == False:
+            db_manager.add_rating(game, rating, activity_type, timestamp, discord_id)
+        else:
+            db_manager.update_rating(game, rating, activity_type, timestamp, discord_id)
         if activity_type in ("completed", "dropped"):
             await ctx.send(f"You gave {game.title}, a rating of {rating} out of 10! You have {activity_type} this game.")
         else:
@@ -146,7 +160,7 @@ async def specials(ctx):
 
         embed.add_field(name="Original Price", value=f"${game.original_price}", inline=True)
         embed.add_field(name="Discount Percent", value=game.discount_percent, inline=True)
-        embed.add_field(name="Dicount Price", value=game.discount_price, inline=True)
+        embed.add_field(name="Dicount Price", value=f"${game.discount_price}", inline=True)
 
         if game.monthly_ratings != None:
             match = re.search(r"(\d+)\%", game.monthly_ratings)
