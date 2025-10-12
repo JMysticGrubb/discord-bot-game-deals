@@ -78,21 +78,16 @@ def game_exists(game_id):
             conn.close()
     return exists
 
-def add_game(game, rating, activity_type, timestamp, discord_id):
+def add_game(game):
     '''
     Adds a game to the database
     
     Args:
         game (object): game object containing information about the game (made in steamsales.py)
-        rating (string): user rating on a scale from 1 to 10
-        activity_type (string): user indicated interaction with the game (playing, completed, dropped)
-        timestamp (string): datetime that the user provided a rating and activity_type of format: YYYY-MM-DD
-        discord_id (int): integer for the user's discord id
 
     Returns:
         None
     '''
-
     # Set price to the discounted price if the game is on sale and if not set it to the original price
     if (game.discount_price == None):
         price = game.original_price
@@ -105,6 +100,11 @@ def add_game(game, rating, activity_type, timestamp, discord_id):
     else:
         sale = 0
 
+    if (game.end_date == None):
+        end_date = "NULL"
+    else:
+        end_date = game.end_date
+
     # Grab just the number from the monthly ratings and format it to represent percentages in the form: 0.84
     match = re.search(r"(\d+)%", game.monthly_ratings)
     if match:
@@ -116,24 +116,102 @@ def add_game(game, rating, activity_type, timestamp, discord_id):
     if match:
         all_ratings = float(match.group(1))
         all_ratings = all_ratings / 100
-
-    if (game.end_date == None):
-        end_date = "NULL"
-    else:
-        end_date = game.end_date
     
     try:
         conn = connect_db()
         cursor = conn.cursor()
         cursor.execute("INSERT into game values (?,?,?,?,?)", (game.id, game.title, game.description, game.game_developer, game.game_publisher,))
-        cursor.execute("INSERT into game_price (game_id,price,currency,is_on_sale,end_date) values (?,?,?,?,?)", (game.id, price, "USD", sale, end_date,))
         cursor.execute("INSERT into game_rating (game_id,monthly_rating,all_rating,scrape_date) values (?,?,?,?)", (game.id, monthly_ratings, all_ratings, game.scrape_date,))
+        cursor.execute("INSERT into game_price (game_id,price,currency,is_on_sale,end_date) values (?,?,?,?,?)", (game.id, price, "USD", sale, end_date,))
         for tag in game.tags:
             exists = tag_exists(tag)
             if (exists == False):
                 cursor.execute("INSERT into tag (tag_name) values (?)", (tag,))
                 tag_id = cursor.lastrowid
                 cursor.execute("INSERT into game_tag (game_id, tag_id) values (?,?)", (game.id, tag_id,))
+        conn.commit()
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise e
+    finally:
+        if conn:
+            conn.close()
+
+def update_game(game):
+    '''
+    Updates a game in the database
+    
+    Args:
+        game (object): game object containing information about the game (made in steamsales.py)
+
+    Returns:
+        None
+    '''
+    # Set price to the discounted price if the game is on sale and if not set it to the original price
+    if (game.discount_price == None):
+        price = game.original_price
+    else:
+        price = game.discount_price
+
+    # Format the is_on_sale boolean to fit the database format of 1 for true and 0 for false
+    if (game.is_on_sale == True):
+        sale = 1
+    else:
+        sale = 0
+
+    if (game.end_date == None):
+        end_date = "NULL"
+    else:
+        end_date = game.end_date
+
+    # Grab just the number from the monthly ratings and format it to represent percentages in the form: 0.84
+    match = re.search(r"(\d+)%", game.monthly_ratings)
+    if match:
+        monthly_ratings = float(match.group(1))
+        monthly_ratings = monthly_ratings / 100
+    
+    # Grab just the number from the overall ratings and format it to represent percentages in the form: 0.84
+    match = re.search(r"(\d+)%", game.all_ratings)
+    if match:
+        all_ratings = float(match.group(1))
+        all_ratings = all_ratings / 100
+    
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE game_rating SET monthly_rating = ?, all_rating = ?, scrape_date = ? WHERE game_id = ?", (monthly_ratings, all_ratings, game.scrape_date, game.id,))
+        cursor.execute("UPDATE game_price SET price = ?, currency = ?, is_on_sale = ?, end_date = ? WHERE game_id = ?", (price, "USD", sale, end_date, game.id,))
+        for tag in game.tags:
+            exists = tag_exists(tag)
+            if (exists == False):
+                cursor.execute("INSERT into tag (tag_name) values (?)", (tag,))
+                tag_id = cursor.lastrowid
+                cursor.execute("INSERT into game_tag (game_id, tag_id) values (?,?)", (game.id, tag_id,))
+        conn.commit()
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise e
+    finally:
+        if conn:
+            conn.close()
+
+def add_rating(game, rating, activity_type, timestamp, discord_id):
+    '''
+    Adds a user rating to a game
+    
+    Args:
+        game (object): game object containing information about the game (made in steamsales.py)
+        rating (string): user rating on a scale from 1 to 10
+        activity_type (string): user indicated interaction with the game (playing, completed, dropped)
+        timestamp (string): datetime that the user provided a rating and activity_type of format: YYYY-MM-DD
+        discord_id (int): integer for the user's discord id
+
+    Returns:
+        None
+    '''
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
         cursor.execute("INSERT into user_activity (discord_id, game_id, activity_type, rating, timestamp) values (?,?,?,?,?)", (discord_id, game.id, activity_type, rating, timestamp,))
         conn.commit()
     except sqlite3.Error as e:
@@ -142,6 +220,32 @@ def add_game(game, rating, activity_type, timestamp, discord_id):
     finally:
         if conn:
             conn.close()
+
+def update_rating(game, rating, activity_type, timestamp, discord_id):
+    '''
+    Updates a user rating to a game
+    
+    Args:
+        game (object): game object containing information about the game (made in steamsales.py)
+        rating (string): user rating on a scale from 1 to 10
+        activity_type (string): user indicated interaction with the game (playing, completed, dropped)
+        timestamp (string): datetime that the user provided a rating and activity_type of format: YYYY-MM-DD
+        discord_id (int): integer for the user's discord id
+
+    Returns:
+        None
+    '''
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE user_activity SET activity_type = ?, rating = ?, timestamp = ? WHERE discord_id = ? AND game_id = ?", (activity_type, rating, timestamp, discord_id, game.id,))
+        conn.commit()
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise e
+    finally:
+        if conn:
+            conn.close() 
 
 def user_exists(discord_id):
     '''
