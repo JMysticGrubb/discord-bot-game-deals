@@ -7,5 +7,5 @@ An automated general purpose discord bot that handles game sales and deals along
 
 ## Features
 * **Steam Sales:** Outputs the top 5 games in the specials category on steam store to a discord channel.
-* **Epic Games Free** Outputs the free games from the week from Epic Games to a discord channel.
-* **Rating System** Stores user info and user ratings into a database.
+* **Epic Games Free:** Outputs the free games from the week from Epic Games to a discord channel.
+* **Rating System:** Stores user info and user ratings into a database.
