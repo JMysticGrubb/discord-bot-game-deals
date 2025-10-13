@@ -245,7 +245,47 @@ def update_rating(game, rating, activity_type, timestamp, discord_id):
         raise e
     finally:
         if conn:
-            conn.close() 
+            conn.close()
+
+def get_rating_stats(discord_id):
+    '''
+    Gets various user stats based on their ratings and activity status:
+    - Average game rating
+    - % of games completed
+    - Most common tags
+    
+    Args:
+        discord_id (int): integer for the user's discord id
+
+    Returns:
+        None
+    '''
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
+
+        # Get the user's average rating
+        cursor.execute("SELECT AVG(rating) FROM user_activity WHERE discord_id = ?", (discord_id,))
+        average_rating = round(float(cursor.fetchone()[0]), 2) # Get the float value from the tuple that is returned by the cursor
+
+        # Get the percentage of games the user completed
+        cursor.execute("SELECT count(activity_type) FROM user_activity WHERE discord_id = ? AND activity_type = ?", (discord_id, "completed",))
+        completed_count = float(cursor.fetchone()[0]) # Get the float value from the tuple that is returned by the cursor
+
+        cursor.execute("SELECT count(activity_type) FROM user_activity WHERE discord_id = ?", (discord_id,))
+        activity_count = float(cursor.fetchone()[0]) # Get the float value from the tuple that is returned by the cursor
+        completed_percent = round(float((completed_count / activity_count) * 100), 1)
+        completed_percent = str(completed_percent) + '%'
+
+        #cursor.execute("SELECT max(count(tag_id))")
+
+
+    except sqlite3.Error as e:
+        raise e
+    finally:
+        if conn:
+            conn.close()
+            return average_rating, completed_percent
 
 def user_exists(discord_id):
     '''

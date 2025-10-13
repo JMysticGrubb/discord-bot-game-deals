@@ -45,6 +45,8 @@ async def ratings(ctx):
         discord_id = int(ctx.author.id)
         if db_manager.user_exists(discord_id) == False:
             raise errors.UserDoesNotExist(f"A user associated with id: {discord_id} does not exist. Please set up a profile using the -profile command.")
+        rating_stats = db_manager.get_rating_stats(discord_id)
+        print(rating_stats[0], rating_stats[1])
     except errors.UserDoesNotExist as e:
         await ctx.send(e)
 
@@ -61,7 +63,7 @@ async def rategame(ctx, game_link, rating, activity_type):
             raise errors.UserDoesNotExist(f"A user associated with id: {discord_id} does not exist. Please set up a profile using the -profile command.")
         game = steamsales.game_search(game_link)
         game_exists = db_manager.game_exists(game.id)
-        rating_exists = db_manager.rating_exists(ctx.author.id, game.id)
+        rating_exists = db_manager.rating_exists(discord_id, game.id)
         timestamp = datetime.date.today().strftime("%Y-%m-%d")
         if activity_type not in ACTIVITY_TYPES:
             raise ValueError("The input for activity_type is not valid. It must be: \"playing\", \"completed\", or \"dropped\"")
