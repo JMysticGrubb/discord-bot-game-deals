@@ -45,8 +45,13 @@ async def ratings(ctx):
         discord_id = int(ctx.author.id)
         if db_manager.user_exists(discord_id) == False:
             raise errors.UserDoesNotExist(f"A user associated with id: {discord_id} does not exist. Please set up a profile using the -profile command.")
-        rating_stats = db_manager.get_rating_stats(discord_id)
-        print(rating_stats[0], rating_stats[1])
+        average_rating, completed_percent, titles, activity_types, ratings, timestamps = db_manager.get_rating_stats(discord_id)
+        print("here")
+        print(average_rating, completed_percent)
+        print(titles)
+        print(activity_types)
+        print(ratings)
+        print(timestamps)
     except errors.UserDoesNotExist as e:
         await ctx.send(e)
 
