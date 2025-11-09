@@ -15,6 +15,9 @@ BOT_TOKEN = config('BOT_TOKEN', None)
 CHANNEL_ID = int(config('CHANNEL_ID', None))
 THUMBS_UP = '👍'
 THUMBS_DOWN = '👎'
+RIGHT_ARROW = '➡️'
+LEFT_ARROW = '⬅️'
+BLACK_SQUARE = '◾'
 PLAYSTYLE_OPTIONS = ('casual', 'competitive', 'mix')
 ACTIVITY_TYPES = ('playing', 'completed', 'dropped')
 
@@ -46,14 +49,67 @@ async def ratings(ctx):
         if db_manager.user_exists(discord_id) == False:
             raise errors.UserDoesNotExist(f"A user associated with id: {discord_id} does not exist. Please set up a profile using the -profile command.")
         average_rating, completed_percent, titles, activity_types, ratings, timestamps = db_manager.get_rating_stats(discord_id)
-        print("here")
-        print(average_rating, completed_percent)
-        print(titles)
-        print(activity_types)
-        print(ratings)
-        print(timestamps)
+
+        def check(reaction, user):
+            return (
+                user == ctx.author
+            )
+
+        numGames = 10
+        start = 0
+        embed = discord.Embed(title="Game Ratings")
+        embed.add_field(name='Average Rating', value=average_rating)
+        embed.add_field(name='Percentage of Games Completed', value=completed_percent)
+        for i in range(start, numGames):
+            if (i >= len(titles)):
+                break
+            embed.add_field(name=f"Game: {i+1}", value=f"{titles[i]} · {activity_types[i]} · {ratings[i]} · {timestamps[i]}", inline=False)
+        message = await ctx.send(embed=embed)
+        await message.add_reaction(LEFT_ARROW)
+        await message.add_reaction(RIGHT_ARROW)
+
+        while True: # Loops until user stops interacting with list
+            reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60.0)
+            if str(reaction.emoji) == RIGHT_ARROW:
+                start += 10
+                numGames += 10
+                if (start >= len(titles)):
+                    start -= 10
+                    numGames -= 10
+                    await message.remove_reaction(reaction.emoji, ctx.author)
+                    continue
+                embed = discord.Embed(title="Game Ratings")
+                embed.add_field(name='Average Rating', value=average_rating)
+                embed.add_field(name='Percentage of Games Completed', value=completed_percent)
+                for i in range(start, numGames):
+                    if (i >= len(titles)):
+                        break
+                    embed.add_field(name=f"Game: {i+1}", value=f"{titles[i]} **·** {activity_types[i]} **·** {ratings[i]} **·** {timestamps[i]}", inline=False)
+                await message.edit(embed=embed)
+                await message.remove_reaction(reaction.emoji, ctx.author)
+            if str(reaction.emoji) == LEFT_ARROW:
+                start -= 10
+                numGames -= 10
+                if (start < 0):
+                    start += 10
+                    numGames += 10
+                    await message.remove_reaction(reaction.emoji, ctx.author)
+                    continue
+                embed = discord.Embed(title="Game Ratings")
+                embed.add_field(name='Average Rating', value=average_rating)
+                embed.add_field(name='Percentage of Games Completed', value=completed_percent)
+                for i in range(start, numGames):
+                    if (i > len(titles)):
+                        break
+                    embed.add_field(name=f"Game: {i+1}", value=f"{titles[i]} **·** {activity_types[i]} **·** {ratings[i]} **·** {timestamps[i]}", inline=False)
+                await message.edit(embed=embed)
+                await message.remove_reaction(reaction.emoji, ctx.author)
     except errors.UserDoesNotExist as e:
         await ctx.send(e)
+    except asyncio.TimeoutError:
+        await ctx.send("Interactions ended.")
+    except Exception as e:
+        print(e)
 
 @bot.command()
 async def rategame(ctx, game_link, rating, activity_type):
