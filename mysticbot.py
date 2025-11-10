@@ -20,6 +20,7 @@ LEFT_ARROW = '⬅️'
 BLACK_SQUARE = '◾'
 PLAYSTYLE_OPTIONS = ('casual', 'competitive', 'mix')
 ACTIVITY_TYPES = ('playing', 'completed', 'dropped')
+GAMES_PER_PAGE = 10
 
 bot = commands.Bot(command_prefix="-", intents=discord.Intents.all(), help_command=commands.DefaultHelpCommand(show_parameter_descriptions=False))
 
@@ -29,7 +30,7 @@ async def on_ready():
     logging.basicConfig(filename='mysticbot.log', level=logging.INFO)
     embed = discord.Embed(
         title="Mystic Bot",
-        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -freethisweek: Displays information on the games that can be redeemed for free on Epic Games.\n -profile: Create a profile that tracks your games and ratings\n -rategame (steam game link) (rating out of 10) (activity_type: \"playing\", \"completed\", \"dropped\"): Add a game to the database with your user rating out of 10\n -help: shows all bot commands.",
+        description=f"List of Commands:\n -specials: Displays information on the top 5 games in the specials category on steam.\n -freethisweek: Displays information on the games that can be redeemed for free on Epic Games.\n -profile: Create a profile that tracks your games and ratings\n -rategame (steam game link) (rating out of 10) (activity_type: \"playing\", \"completed\", \"dropped\"): Add a game to the database with your user rating out of 10\n -ratings: display the stats and ratings from your profile\n -help: shows all bot commands.",
         color=discord.Color.red()
     )
     await channel.send(embed=embed)
@@ -50,66 +51,85 @@ async def ratings(ctx):
             raise errors.UserDoesNotExist(f"A user associated with id: {discord_id} does not exist. Please set up a profile using the -profile command.")
         average_rating, completed_percent, titles, activity_types, ratings, timestamps = db_manager.get_rating_stats(discord_id)
 
-        def check(reaction, user):
-            return (
-                user == ctx.author
-            )
+        view = PaginatorView(average_rating, completed_percent, titles, activity_types, ratings, timestamps)
 
-        numGames = 10
-        start = 0
-        embed = discord.Embed(title="Game Ratings")
-        embed.add_field(name='Average Rating', value=average_rating)
-        embed.add_field(name='Percentage of Games Completed', value=completed_percent)
-        for i in range(start, numGames):
-            if (i >= len(titles)):
-                break
-            embed.add_field(name=f"Game: {i+1}", value=f"{titles[i]} · {activity_types[i]} · {ratings[i]} · {timestamps[i]}", inline=False)
-        message = await ctx.send(embed=embed)
-        await message.add_reaction(LEFT_ARROW)
-        await message.add_reaction(RIGHT_ARROW)
+        initial_embed = view.create_ratings_embed()
 
-        while True: # Loops until user stops interacting with list
-            reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60.0)
-            if str(reaction.emoji) == RIGHT_ARROW:
-                start += 10
-                numGames += 10
-                if (start >= len(titles)):
-                    start -= 10
-                    numGames -= 10
-                    await message.remove_reaction(reaction.emoji, ctx.author)
-                    continue
-                embed = discord.Embed(title="Game Ratings")
-                embed.add_field(name='Average Rating', value=average_rating)
-                embed.add_field(name='Percentage of Games Completed', value=completed_percent)
-                for i in range(start, numGames):
-                    if (i >= len(titles)):
-                        break
-                    embed.add_field(name=f"Game: {i+1}", value=f"{titles[i]} **·** {activity_types[i]} **·** {ratings[i]} **·** {timestamps[i]}", inline=False)
-                await message.edit(embed=embed)
-                await message.remove_reaction(reaction.emoji, ctx.author)
-            if str(reaction.emoji) == LEFT_ARROW:
-                start -= 10
-                numGames -= 10
-                if (start < 0):
-                    start += 10
-                    numGames += 10
-                    await message.remove_reaction(reaction.emoji, ctx.author)
-                    continue
-                embed = discord.Embed(title="Game Ratings")
-                embed.add_field(name='Average Rating', value=average_rating)
-                embed.add_field(name='Percentage of Games Completed', value=completed_percent)
-                for i in range(start, numGames):
-                    if (i > len(titles)):
-                        break
-                    embed.add_field(name=f"Game: {i+1}", value=f"{titles[i]} **·** {activity_types[i]} **·** {ratings[i]} **·** {timestamps[i]}", inline=False)
-                await message.edit(embed=embed)
-                await message.remove_reaction(reaction.emoji, ctx.author)
+        message = await ctx.send(embed=initial_embed, view=view)
+
+        view.message = message
     except errors.UserDoesNotExist as e:
         await ctx.send(e)
-    except asyncio.TimeoutError:
-        await ctx.send("Interactions ended.")
     except Exception as e:
-        print(e)
+        await ctx.send("There was an error displaying your ratings")
+
+class PaginatorView(discord.ui.View):
+    '''Manages the page view for the user's game ratings. Provides interactable buttons to go the the next and previous pages'''
+    def __init__(self, average_rating, completed_percent, titles, activity_types, ratings, timestamps):
+        super().__init__(timeout=60)
+
+        self.average_rating = average_rating
+        self.completed_percent = completed_percent
+        self.titles = titles
+        self.activity_types = activity_types
+        self.ratings = ratings
+        self.timestamps = timestamps
+        self.start = 0
+        self.max_start = max(0, len(self.titles) - 1)
+
+    def create_ratings_embed(self):
+        numGames = self.start + GAMES_PER_PAGE
+        end_index = min(numGames, len(self.titles))
+
+        embed = discord.Embed(title="Game Ratings")
+        embed.add_field(name='Average Rating', value=self.average_rating)
+        embed.add_field(name='Percentage of Games Completed', value=self.completed_percent)
+        embed.add_field(name="", value=f"`GAME` **·** `STATUS` **·** `SCORE` **·** `DATE`", inline=False)
+        embed.add_field(name="Games:", value="", inline=False)
+
+        for i in range(self.start, end_index):
+            embed.add_field(name=f"", value=f"{BLACK_SQUARE} `{self.titles[i]}` **·** `{self.activity_types[i]}` **·** `{self.ratings[i]}` **·** `{self.timestamps[i]}`", inline=False)
+
+        embed.set_footer(text=f"{self.start + 1} to {end_index}")
+
+        return embed
+    
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.primary, emoji=LEFT_ARROW)
+    async def left_button_callback(self, interaction, button):
+        self._refresh_timeout()
+
+        await interaction.response.defer()
+
+        new_start = self.start - GAMES_PER_PAGE
+        if new_start < 0:
+            new_start = 0
+
+        if self.start != new_start:
+            self.start = new_start
+            new_embed = self.create_ratings_embed()
+            await interaction.edit_original_response(embed=new_embed, view=self)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.primary, emoji=RIGHT_ARROW)
+    async def right_button_callback(self, interaction, button):
+        self._refresh_timeout()
+
+        await interaction.response.defer()
+
+        new_start = self.start + GAMES_PER_PAGE
+        if new_start > self.max_start:
+            new_start = self.max_start
+
+        if self.start != new_start:
+            self.start = new_start
+            new_embed = self.create_ratings_embed()
+            await interaction.edit_original_response(embed=new_embed, view=self)
+
+    async def on_timeout(self):
+        if self.message:
+            for item in self.children:
+                item.disabled = True
+
+            await self.message.edit(view=self)
 
 @bot.command()
 async def rategame(ctx, game_link, rating, activity_type):
