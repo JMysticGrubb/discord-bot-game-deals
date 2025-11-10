@@ -51,7 +51,7 @@ async def ratings(ctx):
             raise errors.UserDoesNotExist(f"A user associated with id: {discord_id} does not exist. Please set up a profile using the -profile command.")
         average_rating, completed_percent, titles, activity_types, ratings, timestamps = db_manager.get_rating_stats(discord_id)
 
-        view = PaginatorView(average_rating, completed_percent, titles, activity_types, ratings, timestamps)
+        view = PaginatorView(average_rating, completed_percent, titles, activity_types, ratings, timestamps, ctx.author)
 
         initial_embed = view.create_ratings_embed()
 
@@ -65,7 +65,7 @@ async def ratings(ctx):
 
 class PaginatorView(discord.ui.View):
     '''Manages the page view for the user's game ratings. Provides interactable buttons to go the the next and previous pages'''
-    def __init__(self, average_rating, completed_percent, titles, activity_types, ratings, timestamps):
+    def __init__(self, average_rating, completed_percent, titles, activity_types, ratings, timestamps, author):
         super().__init__(timeout=60)
 
         self.average_rating = average_rating
@@ -74,8 +74,14 @@ class PaginatorView(discord.ui.View):
         self.activity_types = activity_types
         self.ratings = ratings
         self.timestamps = timestamps
+        self.author = author
         self.start = 0
         self.max_start = max(0, len(self.titles) - 1)
+
+    async def interaction_check(self, interaction):
+        if interaction.user != self.author:
+            return False
+        return True
 
     def create_ratings_embed(self):
         numGames = self.start + GAMES_PER_PAGE
@@ -175,50 +181,92 @@ async def profile(ctx):
     exists = db_manager.user_exists(discord_id)
 
     if exists:
-        message = await ctx.send("# You are in the system!\nWould you like to update your profile?")
+        content = "# You are in the system!\nWould you like to update your profile?"
     else:
-        message = await ctx.send("# You are currently not in the system.\nWould you like to be added into the system?\nWe only track your discord_id along with any interests provided by you on steam games")
-
-    await message.add_reaction(THUMBS_UP)
-    await message.add_reaction(THUMBS_DOWN)
-
-    def check(reaction, user):
-        return user == ctx.author and str(reaction.emoji) in [THUMBS_UP, THUMBS_DOWN]
+        content = "# You are currently not in the system.\nWould you like to be added into the system?\nWe only track your discord_id along with any interests provided by you on steam games"
 
     try:
-        reaction, user = await bot.wait_for('reaction_add', check=check, timeout=60.0) # Check for reaction from user
-        if str(reaction.emoji) == THUMBS_UP:
-            if exists:
-                await ctx.send(f"**You chose yes**\nLet's update your profile {ctx.author.mention}!")
-            else:
-                await ctx.send(f"**You chose yes**\nLet's create your profile {ctx.author.mention}!")
-                first_seen = datetime.date.today().strftime("%Y-%m-%d")
-            last_online = datetime.date.today().strftime("%Y-%m-%d")
-            await ctx.send("Please enter a playstyle that is one of the following:\ncasual\ncompetitive\nmix")
-
-            while True: # Loops until correct input is given or a timeout occurs
-                message = await bot.wait_for("message", check=lambda msg: msg.author == ctx.author and msg.channel == ctx.channel, timeout=60.0)
-                if message.content in PLAYSTYLE_OPTIONS:
-                    break
-                else:
-                    await ctx.send("Invalid option. Please try again")
-
-            await ctx.send(f"Recording your playstyle: {message.content}")
-            if exists:
-                db_manager.update_user(discord_id, last_online, message.content)
-            else:
-                db_manager.create_user(discord_id, first_seen, last_online, message.content)
-            await ctx.send(f"Your profile is setup {ctx.author.mention}!")
-        elif str(reaction.emoji) == THUMBS_DOWN: # If the reaction is a thumbs down
-            if exists:
-                await ctx.send(f"**You chose no**\nYour profile was not altered {ctx.author.mention}!")
-            else:
-                await ctx.send("**You chose no**\nWe hope you reconsider in the future!")
-    except asyncio.TimeoutError:
-        await ctx.send("You didn't choose an option in time.")
+        view = ProfileView(ctx.bot, ctx.author, exists, discord_id)
+        message = await ctx.send(content, view=view)
+        view.message = message
     except Exception as e:
         logging.error(f"Error processing userinfo for {ctx.author}: {e}", exc_info=True)
         await ctx.send("Oops, there was an error. Please try again.")
+
+class ProfileView(discord.ui.View):
+    '''Manages the view for the user's profile. Provides interactable buttons to create their profile or update their profile.'''
+    def __init__(self, bot, author, exists, discord_id):
+        super().__init__(timeout=60)
+
+        self.bot = bot
+        self.author = author
+        self.exists = exists
+        self.discord_id = discord_id
+    
+    async def interaction_check(self, interaction):
+        if interaction.user != self.author:
+            return False
+        return True
+
+    @discord.ui.button(label="Yes", style=discord.ButtonStyle.primary, emoji=THUMBS_UP)
+    async def left_button_callback(self, interaction, button):
+        for item in self.children:
+            item.disabled = True
+        await interaction.message.edit(view=self)
+
+        if self.exists:
+            response = f"**You chose yes**\nLet's update your profile {self.author.mention}!"
+        else:
+            response = f"**You chose yes**\nLet's create your profile {self.author.mention}!"
+
+        await interaction.response.send_message(response)
+
+        await interaction.followup.send("Please enter a playstyle that is one of the following:\ncasual\ncompetitive\nmix")
+
+        while True:
+            try:
+                message = await self.bot.wait_for("message", check=lambda msg: msg.author == self.author and msg.channel == interaction.channel, timeout=60.0)
+            except asyncio.TimeoutError:
+                await interaction.response.send_message("You didn't provide a playstyle in time.")
+                return
+            
+            if message.content.lower() in PLAYSTYLE_OPTIONS:
+                playstyle = message.content.lower()
+                break
+            else:
+                await interaction.followup.send("Invalid option. Please try again")
+
+        await interaction.followup.send(f"Recording your playstyle: {playstyle}")
+
+        last_online = datetime.date.today().strftime("%Y-%m-%d")
+
+        if self.exists:
+            db_manager.update_user(self.discord_id, last_online, playstyle)
+        else:
+            first_seen = datetime.date.today().strftime("%Y-%m-%d")
+            db_manager.create_user(self.discord_id, first_seen, last_online, playstyle)
+
+        await interaction.followup.send(f"Your profile is setup {self.author.mention}!")
+
+    @discord.ui.button(label="No", style=discord.ButtonStyle.primary, emoji=THUMBS_DOWN)
+    async def right_button_callback(self, interaction, button):
+        for item in self.children:
+            item.disabled = True
+        await interaction.message.edit(view=self)
+
+        if self.exists:
+            response = f"**You chose no**\nYour profile was not altered {self.author.mention}!"
+        else:
+            response = f"You chose no**\nWe hope you reconsider in the future!"
+
+        await interaction.response.send_message(response)
+
+    async def on_timeout(self):
+        if self.message:
+            for item in self.children:
+                item.disabled = True
+
+            await self.message.edit(view=self)
 
 @bot.command()
 async def specials(ctx):
