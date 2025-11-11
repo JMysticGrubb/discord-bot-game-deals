@@ -448,7 +448,7 @@ def game_search(game_url):
 
     id = int(match.group(1))
     is_on_sale = False
-    title = get_game_title(soup, game_url, is_game)
+    title = get_game_title(soup, is_game)
     description = get_game_description(soup)
     tags = get_game_tags(soup)
     tags = [tag for tag in tags if tag.strip()]

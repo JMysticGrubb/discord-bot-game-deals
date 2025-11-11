@@ -172,7 +172,6 @@ async def rategame(ctx, game_link, rating, activity_type):
         await ctx.send(e)
     except Exception as e:
         await ctx.send(f"Could not find game information for the link: {game_link}")
-        await ctx.send(e)
 
 @bot.command()
 async def profile(ctx):
