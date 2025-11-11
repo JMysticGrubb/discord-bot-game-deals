@@ -46,7 +46,7 @@ class GameInfo:
 
     def print_info(self):
         print(f"Game id: {self.id}")
-        print(f"title: {self.title}")
+        print(f"Title: {self.title}")
         print(f"Description: {self.description}")
         print(f"Tags: {self.tags}")
         print(f"Monthly Ratings: {self.monthly_ratings}")
@@ -118,23 +118,17 @@ def get_game_link(soup, gameid):
     '''
     is_game = True
 
-    match = re.search(r"https://store.steampowered.com/app/" + gameid + r"/([^\"]+)", soup)
-    if match == None:
-        match = re.search(r"https://store.steampowered.com/sub/" + gameid + r"/([^\"]+)", soup)
-        is_game = False
-    game_link = match.group(1) # Extracts the part of the captured link
-    if is_game:
-        game_link = "https://store.steampowered.com/app/" + gameid + "/" + game_link # Concatenates the latter part of the link with the start
-    else:
-        game_link = "https://store.steampowered.com/sub/" + gameid + "/" + game_link # Concatenates the latter part of the link with the start
+    potential_game = soup.find(href=re.compile(gameid))
+    if potential_game:
+        game_link = potential_game['href']
 
     return game_link, is_game
 
 
 
-def get_game_html(game_link, is_game):
+def get_game_url(game_link, is_game):
     '''
-    Creates a text file with the html for a game or package's webpage
+    Finds and returns the url for the game along with the html as a BeautifulSoup object
 
     Args:
         game_link (String): A link to the html of a webpage
@@ -152,10 +146,8 @@ def get_game_html(game_link, is_game):
     
     if is_game:
         meta_tag = soup.find('meta', property='og:url')
-
         if meta_tag:
             url_content = meta_tag['content']
-
     else:
         url_content = game_link.split('?')[0]
 
@@ -163,21 +155,21 @@ def get_game_html(game_link, is_game):
 
 
 
-def get_game_title(soup, game_url, is_game):
+def get_game_title(soup, is_game):
     '''
     Gets the title for a steam game
 
     Args:
         soup (Object): A BeautifulSoup object containing the html for the game
-        game_url (String): A string that has the url for the game
         is_game (Boolean): A boolean indicating if it is a game or package
 
     Returns:
         title (String): String for the title of a game
     '''
     if is_game:
-        match = re.search(r"/\d+/(\w+/?)/", game_url)
-        title = match.group(1).replace('_', ' ').title()
+        title_container = soup.find('span', itemprop="name")
+        if title_container:
+            title = title_container.text
     else:
         title_container = soup.find('h2', class_='pageheader')
         
@@ -412,8 +404,10 @@ def get_game_info(soup, game, specials):
     id = game
     is_on_sale = False
     game_link, is_game = get_game_link(soup, game)
-    game_url, soup = get_game_html(game_link, is_game)
-    title = get_game_title(soup, game_url, is_game)
+    game_url, soup = get_game_url(game_link, is_game)
+    title = get_game_title(soup, is_game)
+    '''with open(title, "w", encoding="utf-8") as f:
+        f.write(soup.prettify())'''
     description = get_game_description(soup)
     tags = get_game_tags(soup)
     tags = [tag for tag in tags if tag.strip()]
@@ -482,7 +476,6 @@ def steam_specials():
 
     html = response.text # Turn the HTTPResponse into html text
     soup = BeautifulSoup(html, 'html.parser') # Parse the html
-    soup_string = str(soup) # Create a string version of the BeautifulSoup object
 
     '''base_file = "html_steam" # Set the file path to the same directory as program but the file html_steam
 
@@ -502,7 +495,7 @@ def steam_specials():
     threads = []
 
     for game in top5_games:
-        t = threading.Thread(target=get_game_info, args=(soup_string, game, specials))
+        t = threading.Thread(target=get_game_info, args=(soup, game, specials))
         threads.append(t)
 
     for t in threads:
@@ -512,3 +505,9 @@ def steam_specials():
         t.join()
 
     return specials
+
+if __name__ == "__main__":
+    specials = steam_specials()
+    for special in specials:
+        special.print_info()
+        print()
