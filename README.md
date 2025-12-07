@@ -14,7 +14,7 @@ An automated general purpose discord bot that handles game sales and deals along
 * **Rating System:** Stores user info and user ratings into a database.
 
 ## Getting Started
-## Prequisites
+### Prequisites
 * Python
 * A Discord Account
 * A Database
