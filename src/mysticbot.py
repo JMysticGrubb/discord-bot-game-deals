@@ -1,7 +1,6 @@
 import asyncio
 from discord.ext import commands, tasks
 import discord
-import os
 from decouple import config
 import re
 import datetime

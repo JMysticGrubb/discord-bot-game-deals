@@ -1,7 +1,5 @@
 import requests
 from bs4 import BeautifulSoup
-import json
-import os
 
 class GameInfo:
     title = None
@@ -50,7 +48,8 @@ def get_free_epic_games():
             description = element["description"]
             original_price = element["price"]["totalPrice"]["originalPrice"]
             original_price /= 100
-            game_url = element["offerMappings"][0]['pageSlug']
+            if len(element["offerMappings"]) > 0:
+                game_url = element["offerMappings"][0]["pageSlug"]
             game_url = "https://store.epicgames.com/en-US/p/" + game_url
             for image in element["keyImages"]:
                 if image["type"] == "OfferImageWide":

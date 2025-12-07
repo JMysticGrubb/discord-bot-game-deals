@@ -291,7 +291,8 @@ def get_rating_stats(discord_id):
     finally:
         if conn:
             conn.close()
-            return average_rating, completed_percent, title, activity_type, rating, timestamp
+    
+    return average_rating, completed_percent, title, activity_type, rating, timestamp
 
 def user_exists(discord_id):
     '''
@@ -314,7 +315,8 @@ def user_exists(discord_id):
     finally:
         if conn:
             conn.close()
-            return exists
+    
+    return exists
 
 def create_user(discord_id, first_seen, last_online, playstyle):
     '''

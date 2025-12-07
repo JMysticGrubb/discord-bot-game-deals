@@ -6,7 +6,6 @@ from decouple import config
 import threading
 import requests
 import datetime
-import db_manager
 
 class GameInfo:
     id = None
