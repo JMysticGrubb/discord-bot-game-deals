@@ -255,7 +255,7 @@ class ProfileView(discord.ui.View):
         if self.exists:
             response = f"**You chose no**\nYour profile was not altered {self.author.mention}!"
         else:
-            response = f"You chose no**\nWe hope you reconsider in the future!"
+            response = f"**You chose no**\nWe hope you reconsider in the future!"
 
         await interaction.response.send_message(response)
 
