@@ -14,6 +14,8 @@ BOT_TOKEN = config('BOT_TOKEN', None)
 CHANNEL_ID = int(config('CHANNEL_ID', None))
 THUMBS_UP = '👍'
 THUMBS_DOWN = '👎'
+STRAIGHT_FACE = '😑'
+TAG = '🏷️'
 RIGHT_ARROW = '➡️'
 LEFT_ARROW = '⬅️'
 BLACK_SQUARE = '◾'
@@ -298,11 +300,11 @@ async def specials(ctx):
             rating_score = -1
 
         if (rating_score > 80):
-            embed.add_field(name="Monthly Ratings👍", value=f"{game.monthly_ratings}", inline=False)
+            embed.add_field(name=f"Monthly Ratings {THUMBS_UP}", value=f"{game.monthly_ratings}", inline=False)
         elif (rating_score > 50):
-            embed.add_field(name="Monthly Ratings😑", value=f"{game.monthly_ratings}", inline=False)
+            embed.add_field(name=f"Monthly Ratings {STRAIGHT_FACE}", value=f"{game.monthly_ratings}", inline=False)
         elif (rating_score >= 0 and rating_score <= 50):
-            embed.add_field(name="Monthly Ratings👎", value=f"{game.monthly_ratings}", inline=False)
+            embed.add_field(name=f"Monthly Ratings {THUMBS_DOWN}", value=f"{game.monthly_ratings}", inline=False)
             
 
         if game.all_ratings != None:
@@ -312,15 +314,15 @@ async def specials(ctx):
             rating_score = -1
 
         if (rating_score > 80):
-            embed.add_field(name="Overall Ratings👍", value=f"{game.all_ratings}", inline=False)
+            embed.add_field(name=f"Overall Ratings {THUMBS_UP}", value=f"{game.all_ratings}", inline=False)
         elif (rating_score > 50):
-            embed.add_field(name="Overall Ratings😑", value=f"{game.all_ratings}", inline=False)
+            embed.add_field(name=f"Overall Ratings {STRAIGHT_FACE}", value=f"{game.all_ratings}", inline=False)
         elif (rating_score >= 0 and rating_score <= 50):
-            embed.add_field(name="Overall Ratings👎", value=f"{game.all_ratings}", inline=False)
+            embed.add_field(name=f"Overall Ratings {THUMBS_DOWN}", value=f"{game.all_ratings}", inline=False)
 
         if game.tags:
             tags_string = ", ".join(game.tags)
-            embed.add_field(name="Tags🏷️", value=tags_string, inline=False)
+            embed.add_field(name=f"Tags {TAG}", value=tags_string, inline=False)
 
         embed.url = game.game_url
 
