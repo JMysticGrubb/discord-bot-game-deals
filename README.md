@@ -45,9 +45,6 @@ DISCORD_TOKEN=YourBotTokenHere
 
 # Channel ID for the bot to post messages in
 BOT_CHANNEL_ID=123456789012345678
-
-# Database connection string
-DATABASE_PATH=sqlite:///data/bot.db
 ```
 7. Run the Bot
 ```

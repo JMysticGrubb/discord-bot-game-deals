@@ -1,12 +1,13 @@
 import sqlite3
-from decouple import config
+import os
 import re
 
-DATABASE_PATH = config('DATABASE_PATH', None)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+db_path = os.path.join(current_dir, 'games_and_interests.db')
 
 def connect_db():
     '''Connect to database'''
-    return sqlite3.connect(DATABASE_PATH)
+    return sqlite3.connect(db_path)
 
 def tag_exists(tag):
     '''
