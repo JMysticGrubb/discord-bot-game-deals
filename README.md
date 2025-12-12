@@ -38,7 +38,11 @@ python -m venv .venv
 ```
 pip install -r requirements.txt
 ```
-6. Create a .env following this format:
+6. Initialize database
+```
+python init_db.py
+```
+7. Create a .env following this format:
 ```env
 # Discord Bot Token
 DISCORD_TOKEN=YourBotTokenHere
@@ -46,7 +50,7 @@ DISCORD_TOKEN=YourBotTokenHere
 # Channel ID for the bot to post messages in
 BOT_CHANNEL_ID=123456789012345678
 ```
-7. Run the Bot
+8. Run the Bot
 ```
 python mysticbot.py
 ```
