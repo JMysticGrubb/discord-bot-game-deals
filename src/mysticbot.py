@@ -344,7 +344,9 @@ async def freethisweek(ctx):
         if game.game_image:
             embed.set_image(url=game.game_image)
 
-        embed.add_field(name="Original Price:", value=game.original_price, inline=True)
+        embed.add_field(name="Original Price", value=game.original_price, inline=True)
+        embed.add_field(name="Start Date", value=game.start_date, inline=True)
+        embed.add_field(name="End Date", value=game.end_date, inline=True)
 
         embed.url = game.game_url
 
