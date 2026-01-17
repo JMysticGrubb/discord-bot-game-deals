@@ -264,9 +264,9 @@ def get_game_price(soup):
         original_price (String): Returns the original price of the game
         discount_price (String): Returns the discounted price of the game
     '''
-    game_purchase_container = soup.find('div', class_='game_area_purchase_game_wrapper')
-
-    if game_purchase_container:
+    game_purchase_containers = soup.find_all('div', class_='game_area_purchase_game_wrapper')
+    
+    for game_purchase_container in game_purchase_containers:
         discount_percent_container = game_purchase_container.find('div', class_='discount_pct')
         if discount_percent_container:
             discount_percent = discount_percent_container.text.strip()[1:]
@@ -294,6 +294,8 @@ def get_game_price(soup):
                 original_price = original_price_container.text.strip()[1:]
             else:
                 original_price = None
+        else:
+            break
     else:
         discount_percent = None
         original_price = None
@@ -416,6 +418,8 @@ def get_game_info(soup, game, specials):
         is_on_sale = True
     if (is_on_sale):
         end_date = get_sale_end_date(soup)
+    else:
+        end_date = None
     game_image = get_game_image(soup)
     game_developer = get_game_developer(soup)
     game_publisher = get_game_publisher(soup)
