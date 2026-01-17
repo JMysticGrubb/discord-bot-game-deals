@@ -1,4 +1,5 @@
 import requests
+import json
 
 class GameInfo:
     title = None
@@ -37,10 +38,10 @@ def get_free_epic_games():
     free_game_json = response.json()
 
     # Puts the json in a file
-    '''
+    
     with open("free_game_json", "w") as f:
         json.dump(free_game_json, f, indent="")
-    '''
+    
         
     free_games = []
 
@@ -50,7 +51,7 @@ def get_free_epic_games():
             title = element["title"]
             description = element["description"]
             start_date, start_time = element["effectiveDate"].split('T')
-            end_date, end_time = element["expiryDate"].split('T')
+            end_date, end_time = element["expiryDate"].split('T') if element["expiryDate"] != None else None, None
             original_price = element["price"]["totalPrice"]["originalPrice"]
             original_price /= 100
 
