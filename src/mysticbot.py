@@ -10,8 +10,15 @@ import db_manager
 import logging
 import errors
 
-BOT_TOKEN = config('BOT_TOKEN', None)
-CHANNEL_ID = int(config('CHANNEL_ID', None))
+# Select the appropriate bot token and channel id based on whether testing is occuring
+ENV_MODE = config('ENV_MODE')
+if ENV_MODE == 'TEST':
+    BOT_TOKEN = config('TEST_TOKEN', None)
+    CHANNEL_ID = int(config('TEST_CHANNEL_ID', None))
+elif ENV_MODE == 'PROD':
+    BOT_TOKEN = config('PROD_TOKEN', None)
+    CHANNEL_ID = int(config('PROD_CHANNEL_ID', None))
+
 THUMBS_UP = '👍'
 THUMBS_DOWN = '👎'
 STRAIGHT_FACE = '😑'
