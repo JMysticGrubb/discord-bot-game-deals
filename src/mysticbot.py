@@ -363,9 +363,9 @@ async def freethisweek(ctx):
 
     return
 
-@tasks.loop(hours=168, minutes=0)
+@tasks.loop(time=datetime.time(hour=16, minute=0, tzinfo=datetime.timezone.utc))
 async def free_games_weekly_post():
-    if datetime.datetime.now(datetime.timezone.utc).weekday() == 4 and datetime.datetime.now(datetime.timezone.utc).hour >= 15: # Only posts on Thursdays after 10am (when the new free games are out)
+    if datetime.datetime.now(datetime.timezone.utc).weekday() == 3: # Only posts on Thursdays after 10am (when the new free games are out)
         channel = bot.get_channel(CHANNEL_ID)
         await freethisweek(channel)
 
